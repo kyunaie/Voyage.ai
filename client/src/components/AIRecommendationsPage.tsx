@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Sparkles, RefreshCw, ArrowLeft } from "lucide-react";
+import { RefreshCw, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { DestinationCard } from "./DestinationCard";
 import { DestinationDetailModal } from "./DestinationDetailModal";
 import { ThemeToggle } from "./ThemeToggle";
+import { AIChatBar } from "./AIChatBar";
 import type { Destination } from "@shared/schema";
 
 import beachImg from "@assets/stock_images/beautiful_beach_dest_1f26de4d.jpg";
@@ -108,35 +108,138 @@ const allDestinations: Destination[] = [
   },
 ];
 
-const categories = ["All", "Beach", "Adventure", "Cultural", "Nature", "Budget"];
+// Intent detection function
+function parseIntent(query: string): {
+  category?: string;
+  maxBudget?: number;
+  vibe?: string;
+  duration?: string;
+} {
+  const lowerQuery = query.toLowerCase();
+  const intent: any = {};
+
+  // Detect category
+  if (lowerQuery.includes("beach") || lowerQuery.includes("coastal") || lowerQuery.includes("sea")) {
+    intent.category = "Beach";
+  } else if (lowerQuery.includes("mountain") || lowerQuery.includes("hill") || lowerQuery.includes("trek")) {
+    intent.category = "Adventure";
+  } else if (lowerQuery.includes("temple") || lowerQuery.includes("cultural") || lowerQuery.includes("heritage") || lowerQuery.includes("historical")) {
+    intent.category = "Cultural";
+  } else if (lowerQuery.includes("nature") || lowerQuery.includes("forest") || lowerQuery.includes("wildlife")) {
+    intent.category = "Nature";
+  } else if (lowerQuery.includes("desert") || lowerQuery.includes("sand")) {
+    intent.category = "Desert";
+  } else if (lowerQuery.includes("city") || lowerQuery.includes("urban")) {
+    intent.category = "City";
+  }
+
+  // Detect budget
+  const budgetMatch = lowerQuery.match(/(?:under|below|less than|max|budget)\s*(?:₹|rs\.?|rupees?)?\s*(\d+)k?/i);
+  if (budgetMatch) {
+    const amount = parseInt(budgetMatch[1]);
+    intent.maxBudget = amount > 100 ? amount : amount * 1000;
+  } else if (lowerQuery.includes("budget") || lowerQuery.includes("cheap") || lowerQuery.includes("affordable")) {
+    intent.maxBudget = 18000;
+  } else if (lowerQuery.includes("luxury") || lowerQuery.includes("premium")) {
+    intent.maxBudget = 50000;
+  }
+
+  // Detect vibe
+  if (lowerQuery.includes("romantic") || lowerQuery.includes("couple")) {
+    intent.vibe = "romantic";
+  } else if (lowerQuery.includes("family")) {
+    intent.vibe = "family";
+  } else if (lowerQuery.includes("solo") || lowerQuery.includes("alone")) {
+    intent.vibe = "solo";
+  } else if (lowerQuery.includes("adventure") || lowerQuery.includes("thrill")) {
+    intent.vibe = "adventure";
+  }
+
+  // Detect duration
+  if (lowerQuery.includes("weekend") || lowerQuery.includes("2 day") || lowerQuery.includes("short")) {
+    intent.duration = "short";
+  } else if (lowerQuery.includes("week") || lowerQuery.includes("5 day") || lowerQuery.includes("6 day") || lowerQuery.includes("7 day")) {
+    intent.duration = "long";
+  }
+
+  return intent;
+}
 
 export function AIRecommendationsPage() {
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [destinations, setDestinations] = useState<Destination[]>(
     allDestinations.slice(0, 6)
   );
+  const [currentQuery, setCurrentQuery] = useState("");
 
-  const handleRegenerate = () => {
-    setIsRegenerating(true);
+  const handleAISearch = (query: string) => {
+    setCurrentQuery(query);
+    setIsProcessing(true);
+
+    // Parse the intent
+    const intent = parseIntent(query);
+    
+    // Simulate AI processing delay
     setTimeout(() => {
-      const shuffled = [...allDestinations].sort(() => Math.random() - 0.5);
+      let filtered = [...allDestinations];
+
+      // Filter by category
+      if (intent.category) {
+        filtered = filtered.filter(d => d.category === intent.category);
+      }
+
+      // Filter by budget
+      if (intent.maxBudget !== undefined) {
+        filtered = filtered.filter(d => d.price <= intent.maxBudget!);
+      }
+
+      // Filter by vibe (simple mapping for demo)
+      if (intent.vibe === "romantic") {
+        filtered = filtered.filter(d => 
+          d.category === "City" || d.category === "Beach" || d.name.includes("Udaipur")
+        );
+      } else if (intent.vibe === "adventure") {
+        filtered = filtered.filter(d => 
+          d.category === "Adventure" || d.category === "Desert"
+        );
+      } else if (intent.vibe === "family") {
+        filtered = filtered.filter(d => 
+          d.category === "Nature" || d.category === "Cultural"
+        );
+      }
+
+      // Filter by duration
+      if (intent.duration === "short") {
+        filtered = filtered.filter(d => 
+          d.duration.includes("2 Night") || d.duration.includes("1 Night")
+        );
+      } else if (intent.duration === "long") {
+        filtered = filtered.filter(d => 
+          d.duration.includes("4 Days") || d.duration.includes("5 Days")
+        );
+      }
+
+      // If no results, show all
+      const results = filtered.length > 0 ? filtered : allDestinations;
+      
+      // Shuffle and take 6
+      const shuffled = [...results].sort(() => Math.random() - 0.5);
       setDestinations(shuffled.slice(0, 6));
-      setIsRegenerating(false);
-    }, 1500);
+      setIsProcessing(false);
+    }, 800);
   };
 
-  const handleCategoryFilter = (category: string) => {
-    setSelectedCategory(category);
-    if (category === "All") {
-      setDestinations(allDestinations.slice(0, 6));
-    } else if (category === "Budget") {
-      const budget = allDestinations.filter(d => d.price < 18000).slice(0, 6);
-      setDestinations(budget);
+  const handleRegenerate = () => {
+    if (currentQuery) {
+      handleAISearch(currentQuery);
     } else {
-      const filtered = allDestinations.filter(d => d.category === category).slice(0, 6);
-      setDestinations(filtered.length > 0 ? filtered : allDestinations.slice(0, 6));
+      setIsProcessing(true);
+      setTimeout(() => {
+        const shuffled = [...allDestinations].sort(() => Math.random() - 0.5);
+        setDestinations(shuffled.slice(0, 6));
+        setIsProcessing(false);
+      }, 800);
     }
   };
 
@@ -170,32 +273,10 @@ export function AIRecommendationsPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        <div className="bg-gradient-to-r from-ai-accent/10 to-primary/10 rounded-2xl p-6 lg:p-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="h-6 w-6 text-ai-accent" />
-            <h2 className="text-3xl font-bold">AI Recommendations for You</h2>
-          </div>
-          <p className="text-muted-foreground">
-            Based on your travel history, preferences & budget
-          </p>
-          
-          <div className="flex flex-wrap gap-2 mt-6">
-            {categories.map((category) => (
-              <Badge
-                key={category}
-                variant={selectedCategory === category ? "default" : "outline"}
-                className="cursor-pointer px-4 py-2 hover-elevate"
-                onClick={() => handleCategoryFilter(category)}
-                data-testid={`filter-${category.toLowerCase()}`}
-              >
-                {category}
-              </Badge>
-            ))}
-          </div>
-        </div>
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+        <AIChatBar onSearch={handleAISearch} isProcessing={isProcessing} />
 
-        {isRegenerating ? (
+        {isProcessing ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
@@ -224,11 +305,11 @@ export function AIRecommendationsPage() {
             variant="outline"
             className="gap-2 px-8"
             onClick={handleRegenerate}
-            disabled={isRegenerating}
+            disabled={isProcessing}
             data-testid="button-regenerate"
           >
-            <RefreshCw className={`h-5 w-5 ${isRegenerating ? "animate-spin" : ""}`} />
-            {isRegenerating ? "Generating..." : "Generate New Recommendations"}
+            <RefreshCw className={`h-5 w-5 ${isProcessing ? "animate-spin" : ""}`} />
+            {isProcessing ? "Generating..." : "Generate New Recommendations"}
           </Button>
         </div>
       </main>
