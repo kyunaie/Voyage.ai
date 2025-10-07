@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { RefreshCw, ArrowLeft } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Grid3x3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DestinationCard } from "./DestinationCard";
 import { DestinationDetailModal } from "./DestinationDetailModal";
-import { ThemeToggle } from "./ThemeToggle";
 import { AIChatBar } from "./AIChatBar";
+import { MapView } from "./MapView";
+import { EnhancedNavbar } from "./EnhancedNavbar";
 import type { Destination } from "@shared/schema";
 
 import beachImg from "@assets/stock_images/beautiful_beach_dest_1f26de4d.jpg";
@@ -172,29 +172,26 @@ export function AIRecommendationsPage() {
     allDestinations.slice(0, 6)
   );
   const [currentQuery, setCurrentQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
+  const [mapSelectedId, setMapSelectedId] = useState<string | undefined>(undefined);
 
   const handleAISearch = (query: string) => {
     setCurrentQuery(query);
     setIsProcessing(true);
 
-    // Parse the intent
     const intent = parseIntent(query);
     
-    // Simulate AI processing delay
     setTimeout(() => {
       let filtered = [...allDestinations];
 
-      // Filter by category
       if (intent.category) {
         filtered = filtered.filter(d => d.category === intent.category);
       }
 
-      // Filter by budget
       if (intent.maxBudget !== undefined) {
         filtered = filtered.filter(d => d.price <= intent.maxBudget!);
       }
 
-      // Filter by vibe (simple mapping for demo)
       if (intent.vibe === "romantic") {
         filtered = filtered.filter(d => 
           d.category === "City" || d.category === "Beach" || d.name.includes("Udaipur")
@@ -209,7 +206,6 @@ export function AIRecommendationsPage() {
         );
       }
 
-      // Filter by duration
       if (intent.duration === "short") {
         filtered = filtered.filter(d => 
           d.duration.includes("2 Night") || d.duration.includes("1 Night")
@@ -220,10 +216,7 @@ export function AIRecommendationsPage() {
         );
       }
 
-      // If no results, show all
       const results = filtered.length > 0 ? filtered : allDestinations;
-      
-      // Shuffle and take 6
       const shuffled = [...results].sort(() => Math.random() - 0.5);
       setDestinations(shuffled.slice(0, 6));
       setIsProcessing(false);
@@ -255,62 +248,100 @@ export function AIRecommendationsPage() {
     setSelectedDestination(destination);
   };
 
+  const handleMapSelect = (destination: Destination) => {
+    setMapSelectedId(destination.id);
+    const element = document.getElementById(`destination-${destination.id}`);
+    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur-sm z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/">
-                <Button variant="ghost" size="icon" data-testid="button-back">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
-              <h1 className="text-2xl font-bold">AI Travel</h1>
-            </div>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+      <EnhancedNavbar />
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 py-6">
         <AIChatBar onSearch={handleAISearch} isProcessing={isProcessing} />
 
-        {isProcessing ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="h-96 bg-muted animate-pulse rounded-lg"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {destinations.map((destination) => (
-              <DestinationCard
-                key={destination.id}
-                destination={destination}
-                onLike={handleLike}
-                onSkip={handleSkip}
-                onViewStays={handleViewStays}
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="flex justify-center pt-8">
+        {/* Mobile: Tab Switcher */}
+        <div className="lg:hidden flex gap-2 mb-4 mt-4">
           <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 px-8"
-            onClick={handleRegenerate}
-            disabled={isProcessing}
-            data-testid="button-regenerate"
+            variant={viewMode === "grid" ? "default" : "outline"}
+            className="flex-1 gap-2"
+            onClick={() => setViewMode("grid")}
+            data-testid="view-grid"
           >
-            <RefreshCw className={`h-5 w-5 ${isProcessing ? "animate-spin" : ""}`} />
-            {isProcessing ? "Generating..." : "Generate New Recommendations"}
+            <Grid3x3 className="h-4 w-4" />
+            Cards
           </Button>
+          <Button
+            variant={viewMode === "map" ? "default" : "outline"}
+            className="flex-1 gap-2"
+            onClick={() => setViewMode("map")}
+            data-testid="view-map"
+          >
+            <MapIcon className="h-4 w-4" />
+            Map
+          </Button>
+        </div>
+
+        {/* Desktop: Split View, Mobile: Conditional View */}
+        <div className="flex gap-6 mt-6">
+          {/* Cards Section */}
+          <div className={`flex-1 ${viewMode === "map" ? "hidden lg:block" : ""}`}>
+            {isProcessing ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={i}
+                    className="h-96 bg-muted animate-pulse rounded-lg"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {destinations.map((destination) => (
+                  <div
+                    key={destination.id}
+                    id={`destination-${destination.id}`}
+                    className={`transition-all duration-300 ${
+                      mapSelectedId === destination.id ? "ring-2 ring-primary rounded-lg" : ""
+                    }`}
+                  >
+                    <DestinationCard
+                      destination={destination}
+                      onLike={handleLike}
+                      onSkip={handleSkip}
+                      onViewStays={handleViewStays}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-center pt-8">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 px-8"
+                onClick={handleRegenerate}
+                disabled={isProcessing}
+                data-testid="button-regenerate"
+              >
+                <RefreshCw className={`h-5 w-5 ${isProcessing ? "animate-spin" : ""}`} />
+                {isProcessing ? "Generating..." : "Generate New Recommendations"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Map Section - Desktop Sidebar / Mobile Full */}
+          <div className={`lg:w-96 h-[600px] lg:sticky lg:top-24 ${
+            viewMode === "grid" ? "hidden lg:block" : "w-full"
+          }`}>
+            <MapView
+              destinations={destinations}
+              onDestinationSelect={handleMapSelect}
+              selectedDestinationId={mapSelectedId}
+            />
+          </div>
         </div>
       </main>
 
