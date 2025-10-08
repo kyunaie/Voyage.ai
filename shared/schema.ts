@@ -49,3 +49,21 @@ export const insertUserInteractionSchema = createInsertSchema(userInteractions).
 
 export type InsertUserInteraction = z.infer<typeof insertUserInteractionSchema>;
 export type UserInteraction = typeof userInteractions.$inferSelect;
+
+// Activity/Things to do types
+export interface Activity {
+  id: string;
+  name: string;
+  category: string;
+  vibe: "family" | "spiritual" | "temple" | "shopping" | "party" | "nightlife" | "adventure";
+  duration: string;
+  rating: number;
+  location: { x: number; y: number };
+  description: string;
+}
+
+export interface VibeZone {
+  vibe: "family" | "spiritual" | "temple" | "shopping" | "party" | "nightlife" | "adventure";
+  center: { x: number; y: number };
+  radius: number;
+}
